@@ -1,4 +1,6 @@
 import math
+import time
+import heapq
 from functools import cache
 class Node:
     def __init__(self, label):
@@ -8,7 +10,8 @@ class Node:
     def __repr__(self):
         return f'Node {(self.label)}'
     
-heat_loss_map = """2413432311323
+heat_loss_map = """
+2413432311323
 3215453535623
 3255245654254
 3446585845452
@@ -22,8 +25,16 @@ heat_loss_map = """2413432311323
 2546548887735
 4322674655533"""
 
-#with open('heat_loss_map.txt', 'r') as f:
-#    heat_loss_map = f.read()
+
+ultra_mode = True
+
+# my path = 21 to 0,5
+# their path=24
+
+
+#3+2+1+5+3+4+3
+with open('heat_loss_map.txt', 'r') as f:
+    heat_loss_map = f.read()
 
 
 heat_loss_map = heat_loss_map.splitlines()
@@ -32,7 +43,7 @@ start = (0,0)
 end = (len(heat_loss_map)-1, len(heat_loss_map[0])-1)
 cell_num = len(heat_loss_map)*len(heat_loss_map[0])
 
-
+print(end)
 
 @cache
 def validate_coords(y, x):
@@ -46,15 +57,12 @@ def get_cell_cost(y, x):
 
     return int(heat_loss_map[y][x])
 
-
 @cache
-def check_cell(coords, dir, steps_left, cost):
+def check_cell(coords, dir, steps_left, cost, ultra):
     y, x = coords
-    if not validate_coords(y, x):
-        return []
 
     cells = []
-    next_cost = cost + get_cell_cost(y, x)
+
 
     # Possible moves
     moves = {
@@ -66,81 +74,118 @@ def check_cell(coords, dir, steps_left, cost):
 
     opposite_directions = {'right': 'left', 'left': 'right', 'up': 'down', 'down': 'up'}
 
-    
-    # Continue in same direction if steps are left
-    if steps_left > 0:
-        dy, dx = moves[dir]
-        new_coords = (y + dy, x + dx)
-        if validate_coords(*new_coords):
-            cells.append((new_coords, dir, steps_left - 1, next_cost))
+    if not ultra:
+        # Continue in same direction if steps are left
+        if steps_left > 0:
 
-    # Allow turns, avoiding immediate reversal
-    for direction, (dy, dx) in moves.items():
-        if direction != dir and direction != opposite_directions[dir]:
+            dy, dx = moves[dir]
             new_coords = (y + dy, x + dx)
             if validate_coords(*new_coords):
-                cells.append((new_coords, direction, 3, next_cost))  # Reset steps_left to 3 after turning
+                cells.append((new_coords, dir, steps_left - 1, cost + get_cell_cost(*new_coords)))
+
+
+        # Allow turns, avoiding immediate reversal
+        for direction, (dy, dx) in moves.items():
+            new_coords = (y + dy, x + dx)
+            if direction != dir and direction != opposite_directions[dir] and validate_coords(*new_coords):
+
+                cells.append((new_coords, direction, 2, cost + get_cell_cost(*new_coords)))  # Reset steps_left to 3 after turning
+
+    else:
+        # Continue in same direction if steps are left
+        if steps_left > 0:
+
+            dy, dx = moves[dir]
+            new_coords = (y + dy, x + dx)
+            if validate_coords(*new_coords):
+                cells.append((new_coords, dir, steps_left - 1, cost + get_cell_cost(*new_coords)))
+
+
+        if steps_left < 7: #can only turn after 4 moves
+            # Allow turns, avoiding immediate reversal
+            for direction, (dy, dx) in moves.items():
+                new_coords = (y + dy, x + dx)
+
+                if direction != dir and direction != opposite_directions[dir] and validate_coords(*new_coords):
+
+                    cells.append((new_coords, direction, 9, cost + get_cell_cost(*new_coords)))  # Reset steps_left to 3 after turning
 
     return cells
 
 
 
-
 nodes = {}
 
-nodes[(0,0)] = Node((0,0))
+nodes[start] = Node(start)
 
 
 costs = {}
 predecessors = {node: None for node in nodes}
 
 
-costs[nodes[(0,0)].label] = 0
+costs[(nodes[start].label, 'right', 9)] = 0
 
-priority_queue = [(nodes[(0,0)], 'right', 3, 0)]
+priority_queue = []
+heapq.heappush(priority_queue, (0, nodes[start].label, 'right', 9)) 
+
 visited_nodes = set()
 
-
-print(priority_queue[0][2])
+start_time = time.monotonic()
 while priority_queue:
-    priority_queue = sorted(priority_queue, key=lambda x: costs[x[0].label])
-    current_node, dir, step, cost = priority_queue.pop(0)
 
-    if current_node.label in visited_nodes:
+
+    cost, node_label, dir, step = heapq.heappop(priority_queue)  # Modify this line
+    current_node = nodes[node_label]  # Get the node from the label    #print(priority_queue)
+
+    #print(cost, current_node)
+    if (current_node.label, dir, step) in visited_nodes:
         continue
-    visited_nodes.add(current_node.label)
+    visited_nodes.add((current_node.label, dir, step))
 
-    current_node.connections = check_cell(current_node.label, dir, step, cost)
-
+    current_node.connections = check_cell(current_node.label, dir, step, cost, ultra_mode)
+    
     for next_coords, next_dir, next_step, next_cost in current_node.connections:
-        if not validate_coords(*next_coords) or next_coords in visited_nodes:
+        if not validate_coords(*next_coords) or (next_coords, next_dir, next_step) in visited_nodes:
             continue
+        
+        if next_cost < costs.get((next_coords, next_dir, next_step), math.inf):
+            if ultra_mode and next_coords == end:
+                if not next_step < 7:
+                    #print(f'Failed to pass step check for end')
+                    continue
+
+            if not next_coords in nodes:
+                nodes[next_coords] = Node(next_coords)
+
+            costs[(next_coords, next_dir, next_step)] = next_cost
+            predecessors[(next_coords, next_dir, next_step)] = (current_node.label, dir, step)
+            heapq.heappush(priority_queue, (next_cost, next_coords, next_dir, next_step))  # Modify this line
 
 
-        if next_cost < costs.get(next_coords, math.inf):
-
-            costs[next_coords] = next_cost
-            predecessors[next_coords] = current_node.label
-            priority_queue.append((Node(next_coords), next_dir, next_step, next_cost))
+end_time = time.monotonic()
 
 
+print(f'\n\n\n____________________________________________\nAll paths found in {end_time-start_time} seconds.\n')
 
-print(f'\n\n\n____________________________________________\nAll paths found\n')
+#print(costs)
 
+#print(predecessors)
 
-print(costs)
-print(check_cell((1, 4), 'left', 1, 2))
-
+#print(f"{(1,2), 'right', 2, 4} has connections: {check_cell((1,2), 'right', 2, 4)}")
+#print(get_cell_cost(*end))
+#print(check_cell((1, 4), 'left', 1, 0))
 
 # Backtracking the shortest path
-current_coords = end
-shortest_path = [(current_coords, get_cell_cost(*current_coords))]
-total_cost = costs[current_coords]
 
-while current_coords != start:
-    current_coords = predecessors[current_coords]
-    print(current_coords)
-    shortest_path.append((current_coords, get_cell_cost(*current_coords)))
+current_node = min([i for i in costs if i[0] == end], key=lambda x: costs[x])
+#print(current_node)
+shortest_path = [(current_node, get_cell_cost(*current_node[0]))]
+total_cost = costs[current_node]
+#print(f'Starting cost: {total_cost}')
+while current_node[0] != start:
+    current_node = predecessors[current_node]
+    #print(current_node)
+    shortest_path.append((current_node, get_cell_cost(*current_node[0])))
 
 shortest_path.reverse()
 
