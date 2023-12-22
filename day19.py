@@ -114,8 +114,7 @@ def plug_vals_in_check(process_key, bounds, depth):
 
 
     for key, target in conditional_routes: # Perform check on each condition
-        if target == 'A' and key == 'm':
-            print(f'here')
+
         bounds_copy = copy.deepcopy(bounds)
         val = conditions[key].get('>') 
         if val:
@@ -167,9 +166,7 @@ def plug_vals_in_check(process_key, bounds, depth):
         
 
     other_routes = {c_key:c_val for c_key, c_val in list(zip(conditions.keys(), conditions.values()))}
-    
     check_last = True
-
     for other_key in other_routes.keys(): # set the bounds to exclude everything beyond/before the conditional values.
         val = other_routes[other_key].get('>')
 
@@ -185,14 +182,13 @@ def plug_vals_in_check(process_key, bounds, depth):
         else:
             val = other_routes[other_key].get('<')
             
-            if bounds[key][1] < val or bounds[key][0] >val: # Skip if max boundary is beyond value
+            if bounds[other_key][1] < val or bounds[other_key][0] >val: # Skip if max boundary is beyond value
                 check_last = False
                 break
 
-            bounds[other_key] = [val, bounds[key][1]]
+            bounds[other_key] = [val, bounds[other_key][1]]
 
     if check_last:
-
         combos += plug_vals_in_check(last_route, bounds, depth + 1)
 
     return combos
