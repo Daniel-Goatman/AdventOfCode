@@ -1,8 +1,6 @@
 import re
 import json
 import copy
-# https://www.reddit.com/r/adventofcode/comments/18lwcw2/2023_day_19_an_equivalent_part_2_example_spoilers/
-
 
 rules_and_parts = """px{a<2006:qkq,m>2090:A,rfg}
 pv{a>1716:R,A}
@@ -141,26 +139,24 @@ def plug_vals_in_check(process_key, bounds, depth):
         others = {c_key:c_val for c_key, c_val in list(zip(conditions.keys(), conditions.values()))[:conditional_routes.index((key, target))]}#Get all conditions up to the current condition
 
         should_check = True
-        if len(list(others.keys())) > 0:
-        
+    
+        for other_key in others.keys(): # Set the bounds for the conditions to be everything before/beyond their conditional value
+            c_val = others[other_key].get('>')
 
-            for other_key in others.keys(): # Set the bounds for the conditions to be everything before/beyond their conditional value
-                c_val = others[other_key].get('>')
+            #this needs to check if all the fields in the check are within the val
+            if c_val:
 
-                #this needs to check if all the fields in the check are within the val
-                if c_val:
-
-                    if bounds_copy[other_key][0] > c_val:
-                        should_check = False
-                        break
-                    bounds_copy[other_key] = [bounds_copy[other_key][0], c_val]
-                else:
-                    c_val = others[other_key].get('<')
-                    print(other_key,'<', c_val)
-                    if bounds_copy[other_key][1] < c_val:
-                        should_check = False
-                        break
-                    bounds_copy[other_key] = [c_val, bounds_copy[other_key][1]]
+                if bounds_copy[other_key][0] > c_val:
+                    should_check = False
+                    break
+                bounds_copy[other_key] = [bounds_copy[other_key][0], c_val]
+            else:
+                c_val = others[other_key].get('<')
+                print(other_key,'<', c_val)
+                if bounds_copy[other_key][1] < c_val:
+                    should_check = False
+                    break
+                bounds_copy[other_key] = [c_val, bounds_copy[other_key][1]]
                     
         if should_check:
             combos += plug_vals_in_check(target, bounds_copy, depth + 1)
